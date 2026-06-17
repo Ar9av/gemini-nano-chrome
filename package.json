@@ -8,6 +8,7 @@
   },
   "scripts": {
     "enable-flags": "node tools/enable-flags.js",
-    "smoke-test": "node tools/smoke-test.js"
+    "smoke-test": "node tools/smoke-test.js",
+    "serve": "node server/index.js"
   }
 }

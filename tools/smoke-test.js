@@ -4,7 +4,7 @@
 // triggers. LanguageModel.availability() on its own does not move the
 // download forward, it only reports state.
 //
-// Run tools/enable-flags.js first.
+// Launches Chrome with the required flags if it isn't already running.
 //
 // Usage:
 //   node tools/smoke-test.js
@@ -15,6 +15,7 @@ const {
   DEEP_QUERY_ALL_SOURCE,
   DEEP_TEXT_SOURCE,
 } = require("./cdp-client");
+const { ensureChromeReady } = require("./chrome");
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -63,6 +64,7 @@ async function watchProgress(internalsTargetId, isDone) {
 }
 
 async function main() {
+  await ensureChromeReady({ log: console.log });
   await enableDebugPages();
   const internals = await newTarget("chrome://on-device-internals/");
 

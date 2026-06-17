@@ -76,6 +76,82 @@ for await (const chunk of stream) console.log(chunk);
 
 Full example: [`examples/streaming.js`](examples/streaming.js).
 
+## OpenAI-compatible API server
+
+Gemini Nano only runs inside a browser tab, so a Python script or an existing OpenAI client can't call it directly. `server/index.js` bridges that gap: a small HTTP server that speaks the OpenAI chat completions format on one side and drives a real Chrome tab over CDP on the other.
+
+```bash
+node server/index.js          # listens on http://localhost:8788
+PORT=8080 node server/index.js
+```
+
+It launches Chrome itself on the first request if nothing is running yet, the same way `tools/enable-flags.js` does.
+
+| Endpoint | Behavior |
+|---|---|
+| `POST /v1/chat/completions` | Standard request/response shape, `stream: true` for SSE |
+| `GET /v1/models` | Lists a single model, `gemini-nano` |
+| `GET /health` | Reports `LanguageModel.availability()` |
+
+```bash
+curl http://localhost:8788/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "What are you, in one sentence?"}]
+  }'
+```
+
+That also means it works with the official OpenAI SDKs, by pointing them at the local server instead of api.openai.com:
+
+```python
+from openai import OpenAI
+
+client = OpenAI(base_url="http://localhost:8788/v1", api_key="not-needed")
+response = client.chat.completions.create(
+    model="gemini-nano",
+    messages=[{"role": "user", "content": "What are you, in one sentence?"}],
+)
+print(response.choices[0].message.content)
+```
+
+A plain-fetch version with streaming is in [`examples/openai-client.js`](examples/openai-client.js).
+
+`response_format` with a `json_schema` maps to `responseConstraint`, so the structured-output example above works the same way through the server:
+
+```bash
+curl http://localhost:8788/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [{"role": "user", "content": "Classify the sentiment of: \"This works great.\""}],
+    "response_format": {
+      "type": "json_schema",
+      "json_schema": { "name": "sentiment", "schema": {
+        "type": "object",
+        "properties": { "sentiment": {"type": "string"}, "confidence": {"type": "number"} },
+        "required": ["sentiment", "confidence"]
+      }}
+    }
+  }'
+```
+
+### What's supported and what isn't
+
+The full message history (`system`/`user`/`assistant`) maps to a real Prompt API session via `initialPrompts`, so multi-turn conversations carry context correctly. Beyond that:
+
+- `temperature` and `top_k` are honored only when both are set together, and only take effect outside flags-only dev mode (Origin Trial or extension context). In plain flags mode the request still succeeds, with the default sampling instead.
+- `stop` sequences are matched client-side against the streamed text. Once matched, the server stops forwarding further tokens to you, but Chrome keeps generating internally until it finishes.
+- `usage` numbers come from `session.contextUsage` before and after the call, which is an estimate, not an exact token count from Gemini Nano's own tokenizer.
+- No image input, no `max_tokens`, no `n` (multiple completions), no `/v1/completions` or `/v1/embeddings`. Gemini Nano's Prompt API doesn't expose the hooks those need.
+- Each request creates a fresh session built from the messages you sent. The server itself holds no conversation state between requests.
+
+### A note on the profile directory
+
+If you already ran `tools/enable-flags.js` or `tools/smoke-test.js` with a custom `PROFILE_DIR`, set the same value when starting the server, or it launches a separate Chrome profile and downloads the model again:
+
+```bash
+PROFILE_DIR=/tmp/my-profile node server/index.js
+```
+
 ## Automating setup and testing
 
 Clicking through `chrome://flags` by hand works fine once, but it gets old if you're testing repeatedly or want a reproducible setup. `tools/` has two Node scripts that drive a real Chrome instance over the Chrome DevTools Protocol (CDP) instead:

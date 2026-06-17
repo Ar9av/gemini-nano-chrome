@@ -58,6 +58,36 @@ async function evaluate(targetId, expression) {
   return result.result.value;
 }
 
+// Runs an expression that calls a named binding for each streamed chunk
+// (e.g. window.__emit(token)) and forwards every call to onChunk as it
+// happens, instead of waiting for the whole expression to resolve. This is
+// how CDP gets token-by-token output out of a page-side async generator.
+async function evaluateStreaming(targetId, expression, bindingName, onChunk) {
+  const ws = await connect(`ws://localhost:${PORT}/devtools/page/${targetId}`);
+  await send(ws, "Runtime.enable");
+  await send(ws, "Runtime.addBinding", { name: bindingName });
+
+  const bindingHandler = (ev) => {
+    const msg = JSON.parse(ev.data);
+    if (msg.method === "Runtime.bindingCalled" && msg.params.name === bindingName) {
+      onChunk(msg.params.payload);
+    }
+  };
+  ws.addEventListener("message", bindingHandler);
+
+  const result = await send(ws, "Runtime.evaluate", {
+    expression,
+    awaitPromise: true,
+    returnByValue: true,
+  });
+  ws.removeEventListener("message", bindingHandler);
+  ws.close();
+  if (result.exceptionDetails) {
+    throw new Error(result.exceptionDetails.exception?.description || "evaluate failed");
+  }
+  return result.result.value;
+}
+
 // Recurses through shadow roots. Chrome's internal pages (chrome://flags,
 // chrome://on-device-internals) are built from custom elements whose content
 // lives in shadow DOM and is invisible to a plain querySelector/innerText.
@@ -92,6 +122,7 @@ module.exports = {
   listTargets,
   newTarget,
   evaluate,
+  evaluateStreaming,
   DEEP_QUERY_ALL_SOURCE,
   DEEP_TEXT_SOURCE,
 };
