@@ -1,0 +1,13 @@
+{
+  "name": "gemini-nano-chrome",
+  "version": "1.0.0",
+  "description": "Using Gemini Nano through Chrome's built-in Prompt API, with scripts to automate setup and verification",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "enable-flags": "node tools/enable-flags.js",
+    "smoke-test": "node tools/smoke-test.js"
+  }
+}
