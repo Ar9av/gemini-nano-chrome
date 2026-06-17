@@ -24,10 +24,20 @@ const {
 
 const PORT = Number(process.env.PORT || 8788);
 
+const MAX_BODY_BYTES = 1 * 1024 * 1024; // 1 MB
+
 function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
-    req.on("data", (chunk) => (raw += chunk));
+    let size = 0;
+    req.on("data", (chunk) => {
+      size += chunk.length;
+      if (size > MAX_BODY_BYTES) {
+        req.destroy();
+        return reject(new RequestError("request body too large", 413));
+      }
+      raw += chunk;
+    });
     req.on("end", () => {
       if (!raw) return resolve({});
       try {
