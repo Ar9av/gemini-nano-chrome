@@ -266,6 +266,7 @@
   }
 
   async function initSession() {
+    initializing = true;
     if (typeof LanguageModel === "undefined") {
       setStatus("API not found", "error");
       addNote(
@@ -304,6 +305,8 @@
     } catch (err) {
       setStatus("error", "error");
       addNote("Could not start a session: " + err.message, true);
+    } finally {
+      initializing = false;
     }
   }
 
@@ -350,8 +353,10 @@
     inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
   });
 
+  let initializing = false;
   clearBtn.addEventListener("click", () => {
-    if (session) session.destroy();
+    if (initializing) return;
+    if (session) { session.destroy(); session = null; }
     messagesEl.innerHTML = "";
     inputEl.disabled = true;
     sendBtn.disabled = true;
