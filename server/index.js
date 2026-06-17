@@ -112,8 +112,11 @@ async function handleChatCompletionsStreaming(body, res) {
     request,
     (rawChunk) => {
       if (stopped) return;
-      const combined = sent + rawChunk;
-      const { text: truncated, hit } = applyStop(combined, request.stopSequences);
+      // rawChunk from promptStreaming is cumulative (each chunk contains all
+      // text so far), not a delta. Extract only the new portion before
+      // applying stop sequences.
+      const delta = rawChunk.slice(sent.length);
+      const { text: truncated, hit } = applyStop(sent + delta, request.stopSequences);
       const newPortion = truncated.slice(sent.length);
       if (newPortion) write(buildChunk(id, { content: newPortion }, null));
       sent = truncated;
