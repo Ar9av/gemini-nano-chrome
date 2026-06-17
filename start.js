@@ -27,8 +27,8 @@ function startWebServer() {
   const webDir = path.join(__dirname, "web");
   const server = http.createServer((req, res) => {
     const requested = req.url === "/" ? "/index.html" : req.url;
-    const filePath = path.join(webDir, requested);
-    if (!filePath.startsWith(webDir)) {
+    const filePath = path.resolve(webDir, "." + requested);
+    if (!filePath.startsWith(webDir + path.sep) && filePath !== webDir) {
       res.writeHead(403);
       return res.end("forbidden");
     }
