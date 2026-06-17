@@ -211,7 +211,33 @@ Backend Type: GPU (highest quality)
 Folder size: ~4,072 MiB
 ```
 
-Session limits in this build: a 9216-token context window, with `session.contextUsage` / `session.contextWindow` to track consumption as you go.
+## Limits and performance
+
+These numbers come from measuring this build directly. `LanguageModel.params()` isn't available here, so context window and quota behavior come from `session.contextWindow` / `session.contextUsage` and from hitting the limit and reading the error.
+
+**Context window: 9216 tokens**, shared between input and output. Track usage with `session.contextUsage` / `session.contextWindow`. Going over it doesn't truncate silently:
+
+```js
+await session.prompt(hugeText); // hugeText tokenizes to >9216
+// throws QuotaExceededError: "The input is too large."
+// err.requested has the token count that was attempted
+```
+
+**Generation speed: ~50 tokens/sec**, measured with `promptStreaming()` and `session.contextUsage` deltas across three 300-word-essay runs (524, 525, 513 completion tokens; 47.3, 51.1, 51.5 tok/s). Short answers tend a bit higher, 56+ tok/s on a two-sentence explanation.
+
+**Time to first token**: ~80-90ms once the model is warm. A prompt near the context window limit (~3000 input tokens) takes ~2.9s to first token. That's prefill time, roughly 1000 tokens/sec for processing input, much faster than the token-by-token decoding used for generating output.
+
+Tested on:
+
+| | |
+|---|---|
+| Machine | MacBook Pro, Apple M4 Pro |
+| CPU | 14 cores (10 performance + 4 efficiency) |
+| GPU | 20 cores |
+| RAM | 24 GB unified memory |
+| Backend | GPU, highest quality mode (`chrome://on-device-internals` reports this as the selected backend automatically) |
+
+Generation speed scales with the GPU backend Chrome selects for your hardware. Lower-end devices, or devices that fall back to CPU inference, will be slower; there's no documented way to query expected throughput ahead of time short of running a prompt and timing it, the way the numbers above were produced.
 
 ## Other built-in APIs
 
