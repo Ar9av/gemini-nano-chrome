@@ -50,19 +50,31 @@ function readJsonBody(req) {
   });
 }
 
-function sendJson(res, status, body) {
+const ALLOWED_ORIGINS = new Set([
+  `http://localhost:${PORT}`,
+  `http://127.0.0.1:${PORT}`,
+  `http://localhost:${Number(process.env.WEB_PORT || 8123)}`,
+  `http://127.0.0.1:${Number(process.env.WEB_PORT || 8123)}`,
+]);
+
+function corsOrigin(req) {
+  const origin = req.headers.origin;
+  return origin && ALLOWED_ORIGINS.has(origin) ? origin : null;
+}
+
+function sendJson(res, status, body, req) {
   const data = JSON.stringify(body);
-  res.writeHead(status, {
-    "Content-Type": "application/json",
-    "Access-Control-Allow-Origin": "*",
-  });
+  const origin = req ? corsOrigin(req) : null;
+  const headers = { "Content-Type": "application/json" };
+  if (origin) headers["Access-Control-Allow-Origin"] = origin;
+  res.writeHead(status, headers);
   res.end(data);
 }
 
-function sendError(res, err) {
+function sendError(res, err, req) {
   const status = err instanceof RequestError ? err.status : 500;
   if (!(err instanceof RequestError)) console.error(err);
-  sendJson(res, status, { error: { message: err.message, type: status === 400 ? "invalid_request_error" : "server_error" } });
+  sendJson(res, status, { error: { message: err.message, type: status === 400 ? "invalid_request_error" : "server_error" } }, req);
 }
 
 function buildChatRequest(body) {
@@ -105,12 +117,14 @@ async function handleChatCompletionsStreaming(body, res) {
   const request = buildChatRequest(body);
   const id = randomId("chatcmpl");
 
-  res.writeHead(200, {
+  const sseOrigin = corsOrigin(req);
+  const sseHeaders = {
     "Content-Type": "text/event-stream",
     "Cache-Control": "no-cache",
     Connection: "keep-alive",
-    "Access-Control-Allow-Origin": "*",
-  });
+  };
+  if (sseOrigin) sseHeaders["Access-Control-Allow-Origin"] = sseOrigin;
+  res.writeHead(200, sseHeaders);
 
   const write = (chunk) => res.write(`data: ${JSON.stringify(chunk)}\n\n`);
   write(buildChunk(id, { role: "assistant", content: "" }, null));
@@ -172,16 +186,18 @@ async function handleHealth(req, res) {
   } catch (err) {
     availability = `error: ${err.message}`;
   }
-  sendJson(res, 200, { status: "ok", model: "gemini-nano", availability });
+  sendJson(res, 200, { status: "ok", model: "gemini-nano", availability }, req);
 }
 
 const server = http.createServer(async (req, res) => {
   if (req.method === "OPTIONS") {
-    res.writeHead(204, {
-      "Access-Control-Allow-Origin": "*",
+    const origin = corsOrigin(req);
+    const headers = {
       "Access-Control-Allow-Methods": "GET,POST,OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type,Authorization",
-    });
+    };
+    if (origin) headers["Access-Control-Allow-Origin"] = origin;
+    res.writeHead(204, headers);
     return res.end();
   }
 
@@ -190,14 +206,14 @@ const server = http.createServer(async (req, res) => {
       return await handleHealth(req, res);
     }
     if (req.method === "GET" && req.url === "/v1/models") {
-      return sendJson(res, 200, buildModelList());
+      return sendJson(res, 200, buildModelList(), req);
     }
     if (req.method === "POST" && req.url === "/v1/chat/completions") {
       return await handleChatCompletions(req, res);
     }
-    sendJson(res, 404, { error: { message: `no route for ${req.method} ${req.url}`, type: "invalid_request_error" } });
+    sendJson(res, 404, { error: { message: `no route for ${req.method} ${req.url}`, type: "invalid_request_error" } }, req);
   } catch (err) {
-    sendError(res, err);
+    sendError(res, err, req);
   }
 });
 
