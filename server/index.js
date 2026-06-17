@@ -30,15 +30,21 @@ function readJsonBody(req) {
   return new Promise((resolve, reject) => {
     let raw = "";
     let size = 0;
+    let rejected = false;
     req.on("data", (chunk) => {
+      if (rejected) return;
       size += chunk.length;
       if (size > MAX_BODY_BYTES) {
-        req.destroy();
+        // Reject without destroying the socket. Destroying it here closes
+        // the connection before the 413 response can be written, so the
+        // client sees a raw connection reset instead of a JSON error.
+        rejected = true;
         return reject(new RequestError("request body too large", 413));
       }
       raw += chunk;
     });
     req.on("end", () => {
+      if (rejected) return;
       if (!raw) return resolve({});
       try {
         resolve(JSON.parse(raw));
@@ -92,7 +98,7 @@ function buildChatRequest(body) {
   };
 }
 
-async function handleChatCompletionsNonStreaming(body, res) {
+async function handleChatCompletionsNonStreaming(body, res, req) {
   const request = buildChatRequest(body);
   const result = await page.runChatCompletion(request, () => {});
   const { text } = applyStop(result.text, request.stopSequences);
@@ -109,11 +115,12 @@ async function handleChatCompletionsNonStreaming(body, res) {
         completionTokens: result.completionTokens,
         totalTokens: result.totalTokens,
       },
-    })
+    }),
+    req
   );
 }
 
-async function handleChatCompletionsStreaming(body, res) {
+async function handleChatCompletionsStreaming(body, res, req) {
   const request = buildChatRequest(body);
   const id = randomId("chatcmpl");
 
@@ -173,9 +180,9 @@ async function handleChatCompletionsStreaming(body, res) {
 async function handleChatCompletions(req, res) {
   const body = await readJsonBody(req);
   if (body.stream) {
-    await handleChatCompletionsStreaming(body, res);
+    await handleChatCompletionsStreaming(body, res, req);
   } else {
-    await handleChatCompletionsNonStreaming(body, res);
+    await handleChatCompletionsNonStreaming(body, res, req);
   }
 }
 
