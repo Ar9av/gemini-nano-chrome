@@ -284,9 +284,17 @@
       return;
     }
 
-    setStatus("loading model...", "busy");
-    progressWrap.style.display = "block";
-    progressLabel.textContent = "Starting download...";
+    // availability() is the authoritative signal for whether a real
+    // download is needed. When the model is already cached, create() still
+    // fires a 0% then 100% downloadprogress pair just to report install
+    // status even though nothing is transferred -- so gate all "downloading"
+    // chrome on availability rather than on the events themselves.
+    const needsDownload = availability !== "available";
+    setStatus(needsDownload ? "loading model..." : "starting...", "busy");
+    if (needsDownload) {
+      progressWrap.style.display = "block";
+      progressLabel.textContent = "Starting download...";
+    }
 
     // create() can hang indefinitely with no event and no error if the
     // ~4GB model download never starts (offline, or Chrome deferring it
@@ -295,7 +303,7 @@
     const STALL_TIMEOUT_MS = 30000;
     const controller = new AbortController();
     let lastProgressAt = Date.now();
-    const watchdog = setInterval(() => {
+    const watchdog = needsDownload && setInterval(() => {
       const stalledForMs = Date.now() - lastProgressAt;
       if (stalledForMs > STALL_TIMEOUT_MS) {
         controller.abort();
@@ -312,6 +320,7 @@
         signal: controller.signal,
         monitor(m) {
           m.addEventListener("downloadprogress", (e) => {
+            if (!needsDownload) return;
             lastProgressAt = Date.now();
             const pct = Math.round(e.loaded * 100);
             progressFill.style.width = pct + "%";
