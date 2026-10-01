@@ -13,9 +13,13 @@ const DEFAULT_CHROME_BIN = {
   win32: "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
 }[os.platform()];
 
+// Chrome renames and retires these as the API ships: Chrome 154 dropped
+// optimization-guide-on-device-model and renamed prompt-api-for-gemini-nano
+// to prompt-api, with the Prompt API on by default. Each entry lists every
+// known name; a flag with none of them present is simply skipped.
 const FLAGS = [
-  { internalName: "optimization-guide-on-device-model", option: "Enabled BypassPerfRequirement" },
-  { internalName: "prompt-api-for-gemini-nano", option: "Enabled" },
+  { names: ["optimization-guide-on-device-model"], option: "Enabled BypassPerfRequirement" },
+  { names: ["prompt-api-for-gemini-nano", "prompt-api"], option: "Enabled" },
 ];
 
 function sleep(ms) {
@@ -43,21 +47,30 @@ async function setFlagsAndRelaunch(targetId, log) {
   const setFlagsExpr = `
     ${DEEP_QUERY_ALL_SOURCE}
     (function() {
+      if (!deepQueryAll(document, 'flags-experiment').length) return null; // not rendered yet
       const flags = ${JSON.stringify(FLAGS)};
-      return flags.map(({ internalName, option }) => {
-        const el = deepQueryAll(document, '#' + internalName)[0];
-        if (!el) return 'missing: ' + internalName;
+      return flags.map(({ names, option }) => {
+        const el = names.map((n) => deepQueryAll(document, '#' + n)[0]).find(Boolean);
+        if (!el) return { msg: names[0] + ': not in this Chrome version (on by default), skipping' };
         const select = el.shadowRoot.querySelector('select');
         const opt = [...select.options].find((o) => o.text === option);
-        if (!opt) return 'missing option "' + option + '" for ' + internalName;
+        if (!opt) return { msg: 'missing option "' + option + '" for ' + el.id };
+        if (select.value === opt.value) return { msg: el.id + ' -> ' + option + ' (already set)' };
         select.value = opt.value;
         select.dispatchEvent(new Event('change', { bubbles: true }));
-        return internalName + ' -> ' + option;
+        return { msg: el.id + ' -> ' + option, changed: true };
       });
     })()
   `;
-  const setResults = await evaluate(targetId, setFlagsExpr);
-  log(setResults.join("\n"));
+  // On a cold first launch chrome://flags may not have rendered yet.
+  let results = null;
+  for (let i = 0; i < 40 && !results; i++) {
+    results = await evaluate(targetId, setFlagsExpr);
+    if (!results) await sleep(250);
+  }
+  if (!results) throw new Error("chrome://flags never finished loading");
+  log(results.map((r) => r.msg).join("\n"));
+  if (!results.some((r) => r.changed)) return false;
 
   const clickRestartExpr = `
     ${DEEP_QUERY_ALL_SOURCE}
@@ -65,12 +78,15 @@ async function setFlagsAndRelaunch(targetId, log) {
       const app = deepQueryAll(document, 'flags-app')[0];
       const btn = app.shadowRoot.querySelector('#needs-restart cr-button');
       if (!btn) return false;
-      btn.click();
+      // Deferred so this evaluate replies before Chrome starts shutting down;
+      // otherwise the CDP socket can drop mid-call and the process just exits.
+      setTimeout(() => btn.click(), 100);
       return true;
     })()
   `;
   const clicked = await evaluate(targetId, clickRestartExpr);
   if (!clicked) throw new Error("could not find the relaunch button on chrome://flags");
+  return true;
 }
 
 // Idempotent: if Chrome is already up on the configured CDP port (most
@@ -107,11 +123,12 @@ async function ensureChromeReady({
   if (!flagsTarget) flagsTarget = await newTarget("chrome://flags/");
 
   await sleep(500);
-  await setFlagsAndRelaunch(flagsTarget.id, log);
-  log("Relaunching Chrome to apply flags...");
-  await sleep(2000);
-  await waitForCdp();
-  log(`Chrome is running with CDP on port ${PORT} and the required flags set.`);
+  if (await setFlagsAndRelaunch(flagsTarget.id, log)) {
+    log("Relaunching Chrome to apply flags...");
+    await sleep(2000);
+    await waitForCdp();
+  }
+  log(`Chrome is ready (CDP on port ${PORT}).`);
 }
 
 module.exports = { ensureChromeReady, isCdpUp, waitForCdp };
