@@ -12,9 +12,29 @@
     --text: #e7e8ea;
     --muted: #8b8d96;
     --accent: #6e8bff;
+    --accent-text: #fff;
     --user-bubble: #2a3550;
-    --assistant-bubble: #1d1f26;
+    --code-bg: #0e0f12;
+    --ok: #5fd48a;
+    --warn: #e0b75f;
     --danger: #ff6b6b;
+    --danger-bg: #321f1f;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #fafafa;
+      --panel: #ffffff;
+      --border: #e2e3e8;
+      --text: #1b1c20;
+      --muted: #6b6e78;
+      --accent: #4c6ef5;
+      --user-bubble: #e6ebff;
+      --code-bg: #f1f2f5;
+      --ok: #1f9d55;
+      --warn: #b7791f;
+      --danger: #d64545;
+      --danger-bg: #fdecec;
+    }
   }
   * { box-sizing: border-box; }
   body {
@@ -22,39 +42,47 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
     background: var(--bg);
     color: var(--text);
-    height: 100vh;
+    height: 100dvh;
     display: flex;
     flex-direction: column;
   }
+  button { font-family: inherit; }
+  button:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
   header {
-    padding: 14px 20px;
+    padding: 12px 20px;
     border-bottom: 1px solid var(--border);
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
   }
-  header .title {
-    font-weight: 600;
-    font-size: 15px;
-  }
-  header .subtitle {
-    color: var(--muted);
-    font-size: 12px;
-    margin-top: 2px;
-  }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .logo { width: 22px; height: 22px; flex-shrink: 0; }
+  header .title { font-weight: 600; font-size: 15px; }
+  header .subtitle { color: var(--muted); font-size: 12px; margin-top: 2px; }
+  .header-actions { display: flex; align-items: center; gap: 10px; }
   #status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 12px;
-    padding: 4px 10px;
-    border-radius: 999px;
-    border: 1px solid var(--border);
     color: var(--muted);
     white-space: nowrap;
   }
-  #status.ready { color: #5fd48a; border-color: #2c4a37; }
-  #status.busy { color: #e0b75f; border-color: #4a3f2c; }
-  #status.error { color: var(--danger); border-color: #4a2c2c; }
+  #status::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--muted);
+  }
+  #status.ready::before { background: var(--ok); }
+  #status.busy::before { background: var(--warn); animation: pulse 1s ease-in-out infinite; }
+  #status.error { color: var(--danger); }
+  #status.error::before { background: var(--danger); }
 
-  #clearBtn {
+  .ghost-btn {
     background: none;
     border: 1px solid var(--border);
     color: var(--muted);
@@ -62,61 +90,103 @@
     padding: 6px 12px;
     font-size: 13px;
     cursor: pointer;
-    margin-left: 10px;
   }
-  #clearBtn:hover { color: var(--text); border-color: var(--accent); }
+  .ghost-btn:hover:not(:disabled) { color: var(--text); border-color: var(--accent); }
+  .ghost-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
+  #scroller { flex: 1; overflow-y: auto; }
   main {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
+    padding: 24px 20px;
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 18px;
     max-width: 760px;
-    width: 100%;
     margin: 0 auto;
+    min-height: 100%;
   }
+
+  #empty {
+    margin: auto;
+    text-align: center;
+    max-width: 520px;
+  }
+  #empty .hero { width: 44px; height: 44px; margin-bottom: 14px; }
+  #empty h1 { font-size: 22px; font-weight: 600; margin: 0 0 6px; }
+  #empty p { color: var(--muted); font-size: 14px; margin: 0 0 20px; line-height: 1.5; }
+  #suggestions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  #suggestions button {
+    text-align: left;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 10px;
+    padding: 10px 12px;
+    font-size: 13px;
+    line-height: 1.4;
+    cursor: pointer;
+  }
+  #suggestions button:hover:not(:disabled) { border-color: var(--accent); }
+  #suggestions button:disabled { opacity: 0.5; cursor: not-allowed; }
+  @media (max-width: 520px) { #suggestions { grid-template-columns: 1fr; } }
+
   .bubble-row { display: flex; }
   .bubble-row.user { justify-content: flex-end; }
+  .bubble-row.assistant { gap: 12px; align-items: flex-start; }
+  .avatar { width: 20px; height: 20px; flex-shrink: 0; margin-top: 3px; }
   .bubble {
-    max-width: 80%;
-    padding: 10px 14px;
-    border-radius: 14px;
-    line-height: 1.5;
-    font-size: 14.5px;
-    word-wrap: break-word;
+    max-width: 85%;
+    line-height: 1.6;
+    font-size: 15px;
+    overflow-wrap: anywhere;
   }
-  .bubble.user, .bubble.error, .bubble.system-note { white-space: pre-wrap; }
-  .bubble.user { background: var(--user-bubble); border-bottom-right-radius: 4px; }
-  .bubble.assistant { background: var(--assistant-bubble); border-bottom-left-radius: 4px; }
+  .bubble.user {
+    background: var(--user-bubble);
+    padding: 10px 14px;
+    border-radius: 16px 16px 4px 16px;
+    white-space: pre-wrap;
+  }
+  .bubble.assistant { max-width: 100%; }
   .bubble.assistant p { margin: 0 0 10px; }
   .bubble.assistant p:last-child { margin-bottom: 0; }
-  .bubble.assistant ul { margin: 0 0 10px; padding-left: 20px; }
-  .bubble.assistant ul:last-child { margin-bottom: 0; }
+  .bubble.assistant ul, .bubble.assistant ol { margin: 0 0 10px; padding-left: 22px; }
+  .bubble.assistant :is(ul, ol):last-child { margin-bottom: 0; }
+  .bubble.assistant ol + ul { margin-top: -6px; padding-left: 40px; }
   .bubble.assistant code {
-    background: #0e0f12;
+    background: var(--code-bg);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 1px 5px;
     font-size: 13px;
   }
   .bubble.system-note {
-    background: none;
     color: var(--muted);
     font-size: 13px;
     text-align: center;
-    max-width: 100%;
     margin: 0 auto;
   }
-  .bubble.error { background: #321f1f; color: var(--danger); }
+  .bubble.error {
+    background: var(--danger-bg);
+    color: var(--danger);
+    padding: 10px 14px;
+    border-radius: 12px;
+    white-space: pre-wrap;
+  }
+  .stopped { color: var(--muted); font-size: 12px; margin-top: 6px; }
 
-  #progressWrap {
-    max-width: 760px;
-    margin: 0 auto;
-    width: 100%;
-    padding: 0 20px;
+  .typing { display: inline-flex; gap: 4px; padding: 6px 0; }
+  .typing span {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    animation: pulse 1.2s ease-in-out infinite;
   }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+
+  #progressWrap { max-width: 520px; margin: 18px auto 0; width: 100%; text-align: left; }
   #progressBar {
     height: 6px;
     border-radius: 3px;
@@ -124,22 +194,10 @@
     overflow: hidden;
     border: 1px solid var(--border);
   }
-  #progressFill {
-    height: 100%;
-    width: 0%;
-    background: var(--accent);
-    transition: width 0.2s ease;
-  }
-  #progressLabel {
-    font-size: 12px;
-    color: var(--muted);
-    margin: 6px 0 14px;
-  }
+  #progressFill { height: 100%; width: 0%; background: var(--accent); transition: width 0.2s ease; }
+  #progressLabel { font-size: 12px; color: var(--muted); margin-top: 8px; line-height: 1.5; }
 
-  footer {
-    border-top: 1px solid var(--border);
-    padding: 14px 20px 20px;
-  }
+  footer { padding: 0 20px 16px; }
   #composer {
     max-width: 760px;
     margin: 0 auto;
@@ -149,75 +207,154 @@
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 14px;
-    padding: 8px 10px;
+    padding: 8px 8px 8px 12px;
   }
+  #composer:focus-within { border-color: var(--accent); }
   #input {
     flex: 1;
     resize: none;
     border: none;
     background: none;
     color: var(--text);
-    font-size: 14.5px;
+    font-size: 15px;
     font-family: inherit;
-    max-height: 160px;
+    line-height: 1.5;
+    max-height: 200px;
     outline: none;
-    padding: 6px 4px;
+    padding: 6px 0;
   }
   #sendBtn {
     background: var(--accent);
     border: none;
-    color: white;
+    color: var(--accent-text);
     border-radius: 10px;
-    padding: 9px 16px;
+    padding: 8px 16px;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
+    min-width: 72px;
   }
-  #sendBtn:disabled { background: #3a3d46; cursor: not-allowed; }
+  #sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #sendBtn.stop { background: var(--text); color: var(--bg); }
+  #meta {
+    max-width: 760px;
+    margin: 8px auto 0;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11.5px;
+    color: var(--muted);
+  }
+  kbd { font-family: inherit; border: 1px solid var(--border); border-radius: 4px; padding: 0 4px; }
 </style>
 </head>
 <body>
 
+<!-- Gemini mark from thesvg.org (google-gemini, CC0) -->
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <linearGradient id="gemGrad" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4f8cff" /><stop offset=".55" stop-color="#9b72cb" /><stop offset="1" stop-color="#d96570" />
+    </linearGradient>
+  </defs>
+  <symbol id="gem" viewBox="0 0 24 24"><path fill="url(#gemGrad)" d="M11.04 19.32Q12 21.51 12 24q0-2.49.93-4.68.96-2.19 2.58-3.81t3.81-2.55Q21.51 12 24 12q-2.49 0-4.68-.93a12.3 12.3 0 0 1-3.81-2.58 12.3 12.3 0 0 1-2.58-3.81Q12 2.49 12 0q0 2.49-.96 4.68-.93 2.19-2.55 3.81a12.3 12.3 0 0 1-3.81 2.58Q2.49 12 0 12q2.49 0 4.68.96 2.19.93 3.81 2.55t2.55 3.81"/></symbol>
+</svg>
+
 <header>
-  <div>
+  <div class="brand">
+    <svg class="logo" aria-hidden="true"><use href="#gem" /></svg>
+    <div>
     <div class="title">Gemini Nano</div>
-    <div class="subtitle">Running on-device, in this browser. No external network calls.</div>
+    <div class="subtitle">Runs on-device, in this browser. Nothing leaves your machine.</div>
+    </div>
   </div>
-  <div style="display:flex; align-items:center;">
-    <span id="status">checking...</span>
-    <button id="clearBtn">New chat</button>
+  <div class="header-actions">
+    <span id="status" role="status">checking...</span>
+    <button id="clearBtn" class="ghost-btn" disabled>New chat</button>
   </div>
 </header>
 
-<div id="progressWrap" style="display:none;">
-  <div id="progressBar"><div id="progressFill"></div></div>
-  <div id="progressLabel"></div>
+<div id="scroller">
+  <main id="messages" aria-live="polite"></main>
 </div>
 
-<main id="messages"></main>
+<template id="emptyTpl">
+  <div id="empty">
+    <svg class="hero" aria-hidden="true"><use href="#gem" /></svg>
+    <h1>Chat with Gemini Nano</h1>
+    <p>A small language model built into Chrome. Fast, private, and offline once downloaded.</p>
+    <div id="suggestions">
+      <button>Explain what you are in two sentences.</button>
+      <button>Write a haiku about running AI offline.</button>
+      <button>Give me 3 tips for writing clear commit messages.</button>
+      <button>Summarize the pros and cons of on-device AI.</button>
+    </div>
+    <div id="progressWrap" hidden>
+      <div id="progressBar"><div id="progressFill"></div></div>
+      <div id="progressLabel"></div>
+    </div>
+  </div>
+</template>
 
 <footer>
   <div id="composer">
-    <textarea id="input" rows="1" placeholder="Message Gemini Nano..." disabled></textarea>
+    <textarea id="input" rows="1" placeholder="Message Gemini Nano..." aria-label="Message"></textarea>
     <button id="sendBtn" disabled>Send</button>
+  </div>
+  <div id="meta">
+    <span><kbd>Enter</kbd> to send, <kbd>Shift</kbd>+<kbd>Enter</kbd> for a new line</span>
+    <span id="usage"></span>
   </div>
 </footer>
 
 <script>
   const statusEl = document.getElementById("status");
+  const scroller = document.getElementById("scroller");
   const messagesEl = document.getElementById("messages");
   const inputEl = document.getElementById("input");
   const sendBtn = document.getElementById("sendBtn");
   const clearBtn = document.getElementById("clearBtn");
-  const progressWrap = document.getElementById("progressWrap");
-  const progressFill = document.getElementById("progressFill");
-  const progressLabel = document.getElementById("progressLabel");
+  const usageEl = document.getElementById("usage");
+  const emptyTpl = document.getElementById("emptyTpl");
 
   let session = null;
+  let initializing = false;
+  let generating = null; // AbortController while a reply streams
 
   function setStatus(text, kind) {
     statusEl.textContent = text;
     statusEl.className = kind || "";
+  }
+
+  function showEmptyState() {
+    messagesEl.replaceChildren(emptyTpl.content.cloneNode(true));
+    for (const btn of messagesEl.querySelectorAll("#suggestions button")) {
+      btn.disabled = !session;
+      btn.addEventListener("click", () => send(btn.textContent));
+    }
+  }
+
+  function updateUsage() {
+    if (!session || !session.contextWindow) return (usageEl.textContent = "");
+    const used = session.contextUsage ?? session.inputUsage ?? 0;
+    const total = session.contextWindow ?? session.inputQuota;
+    usageEl.textContent = `${used.toLocaleString()} / ${total.toLocaleString()} tokens`;
+    usageEl.style.color = used / total > 0.85 ? "var(--warn)" : "";
+  }
+
+  // Inputs stay typeable while a reply streams; only sending is blocked.
+  function updateControls() {
+    const ready = !!session && !initializing;
+    sendBtn.disabled = !ready || (!generating && !inputEl.value.trim());
+    sendBtn.textContent = generating ? "Stop" : "Send";
+    sendBtn.classList.toggle("stop", !!generating);
+    clearBtn.disabled = initializing;
+  }
+
+  function nearBottom() {
+    return scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 80;
+  }
+  function scrollToBottom(force) {
+    if (force || nearBottom()) scroller.scrollTop = scroller.scrollHeight;
   }
 
   function escapeHtml(str) {
@@ -225,39 +362,52 @@
   }
 
   function renderInline(text) {
-    text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-    text = text.replace(/(^|[^*])\*(?!\*)(.+?)\*(?!\*)/g, "$1<em>$2</em>");
-    text = text.replace(/`(.+?)`/g, "<code>$1</code>");
-    return text;
-  }
-
-  // Gemini Nano replies in Markdown (bold, bullet lists, paragraphs). This
-  // renders just enough of it to avoid showing raw "**" and "*" to the user.
-  function renderMarkdown(raw) {
-    const blocks = escapeHtml(raw).split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-    return blocks
-      .map((block) => {
-        const lines = block.split("\n").filter((l) => l.trim().length);
-        if (lines.length && lines.every((l) => /^[*-]\s+/.test(l.trim()))) {
-          const items = lines
-            .map((l) => "<li>" + renderInline(l.trim().replace(/^[*-]\s+/, "")) + "</li>")
-            .join("");
-          return "<ul>" + items + "</ul>";
-        }
-        return "<p>" + renderInline(block).replace(/\n/g, "<br>") + "</p>";
-      })
+    // Split out `code` spans first so their contents aren't formatted.
+    return text
+      .split(/(`[^`\n]+`)/)
+      .map((part, i) =>
+        i % 2
+          ? "<code>" + part.slice(1, -1) + "</code>"
+          : part
+              .replace(/\*\*(?!\s)(.+?)\*\*/g, "<strong>$1</strong>")
+              .replace(/(^|[\s(])\*(?![\s*])([^*]+?)\*(?=[\s.,;:!?)]|$)/g, "$1<em>$2</em>")
+      )
       .join("");
   }
 
+  // Gemini Nano replies in Markdown (headings, bold, lists, paragraphs). This
+  // renders just enough of it, line by line, so raw "**" / "*" / "##" never
+  // show up in the chat. Nested lists are flattened.
+  function renderMarkdown(raw) {
+    let html = "";
+    let open = null; // "p" | "ul" | "ol"
+    const close = () => { if (open) html += `</${open}>`; open = null; };
+    const ensure = (tag, attrs = "") => { if (open !== tag) { close(); html += `<${tag}${attrs}>`; open = tag; } };
+    for (const line of escapeHtml(raw).split("\n")) {
+      const t = line.trim();
+      let m;
+      if (!t) close();
+      else if ((m = t.match(/^#{1,6}\s+(.*)/))) { close(); html += `<p><strong>${renderInline(m[1])}</strong></p>`; }
+      else if ((m = t.match(/^[*-]\s+(.*)/))) { ensure("ul"); html += `<li>${renderInline(m[1])}</li>`; }
+      else if ((m = t.match(/^(\d+)[.)]\s+(.*)/))) { ensure("ol", ` start="${m[1]}"`); html += `<li>${renderInline(m[2])}</li>`; }
+      else if (open === "p") html += "<br>" + renderInline(t);
+      else { close(); html += "<p>" + renderInline(t); open = "p"; }
+    }
+    close();
+    return html;
+  }
+
   function addBubble(role, text) {
+    document.getElementById("empty")?.remove();
     const row = document.createElement("div");
-    row.className = "bubble-row" + (role === "user" ? " user" : "");
+    row.className = "bubble-row " + role;
+    if (role === "assistant") row.innerHTML = '<svg class="avatar" aria-hidden="true"><use href="#gem" /></svg>';
     const bubble = document.createElement("div");
     bubble.className = "bubble " + role;
     bubble.textContent = text;
     row.appendChild(bubble);
     messagesEl.appendChild(row);
-    messagesEl.scrollTop = messagesEl.scrollHeight;
+    scrollToBottom(true);
     return bubble;
   }
 
@@ -267,140 +417,162 @@
 
   async function initSession() {
     initializing = true;
-    if (typeof LanguageModel === "undefined") {
-      setStatus("API not found", "error");
-      addNote(
-        "LanguageModel isn't available in this browser. Enable chrome://flags/#optimization-guide-on-device-model " +
-        "(Enabled BypassPerfRequirement) and chrome://flags/#prompt-api-for-gemini-nano (Enabled), then relaunch Chrome.",
-        true
-      );
-      return;
-    }
-
-    const availability = await LanguageModel.availability();
-    if (availability === "unavailable") {
-      setStatus("unavailable", "error");
-      addNote("This device doesn't meet Gemini Nano's hardware requirements.", true);
-      return;
-    }
-
-    // availability() is the authoritative signal for whether a real
-    // download is needed. When the model is already cached, create() still
-    // fires a 0% then 100% downloadprogress pair just to report install
-    // status even though nothing is transferred -- so gate all "downloading"
-    // chrome on availability rather than on the events themselves.
-    const needsDownload = availability !== "available";
-    setStatus(needsDownload ? "loading model..." : "starting...", "busy");
-    if (needsDownload) {
-      progressWrap.style.display = "block";
-      progressLabel.textContent = "Starting download...";
-    }
-
-    // create() can hang indefinitely with no event and no error if the
-    // ~4GB model download never starts (offline, or Chrome deferring it
-    // because the device is on battery power). Without this watchdog the
-    // UI sits on "loading model..." forever with no feedback.
-    const STALL_TIMEOUT_MS = 30000;
-    const controller = new AbortController();
-    let lastProgressAt = Date.now();
-    const watchdog = needsDownload && setInterval(() => {
-      const stalledForMs = Date.now() - lastProgressAt;
-      if (stalledForMs > STALL_TIMEOUT_MS) {
-        controller.abort();
-      } else if (stalledForMs > 8000) {
-        progressLabel.textContent =
-          `Still waiting (${Math.round(stalledForMs / 1000)}s, no progress)... ` +
-          "this stalls if you're offline, or if Chrome is deferring the download " +
-          "because the device is on battery power.";
-      }
-    }, 1000);
-
+    updateControls();
+    showEmptyState();
+    const progressWrap = document.getElementById("progressWrap");
+    const progressFill = document.getElementById("progressFill");
+    const progressLabel = document.getElementById("progressLabel");
     try {
-      session = await LanguageModel.create({
-        signal: controller.signal,
-        monitor(m) {
-          m.addEventListener("downloadprogress", (e) => {
-            if (!needsDownload) return;
-            lastProgressAt = Date.now();
-            const pct = Math.round(e.loaded * 100);
-            progressFill.style.width = pct + "%";
-            progressLabel.textContent = `Downloading model: ${pct}%`;
-          });
-        },
-      });
-      progressWrap.style.display = "none";
-      setStatus("ready", "ready");
-      inputEl.disabled = false;
-      sendBtn.disabled = false;
-      inputEl.focus();
-    } catch (err) {
-      setStatus("error", "error");
-      if (err.name === "AbortError") {
+      if (typeof LanguageModel === "undefined") {
+        setStatus("API not found", "error");
         addNote(
-          "Model download stalled for 30s with no progress. This usually means you're " +
-          "offline, or the device is on battery power and Chrome is deferring the ~4GB " +
-          "download until it's plugged in. Fix that, then click \"New chat\" to retry.",
+          "LanguageModel isn't available in this browser. Enable chrome://flags/#optimization-guide-on-device-model " +
+          "(Enabled BypassPerfRequirement) and chrome://flags/#prompt-api-for-gemini-nano (Enabled), then relaunch Chrome.",
           true
         );
-      } else {
-        addNote("Could not start a session: " + err.message, true);
+        return;
+      }
+
+      const availability = await LanguageModel.availability();
+      if (availability === "unavailable") {
+        setStatus("unavailable", "error");
+        addNote("This device doesn't meet Gemini Nano's hardware requirements.", true);
+        return;
+      }
+
+      // availability() is the authoritative signal for whether a real
+      // download is needed. When the model is already cached, create() still
+      // fires a 0% then 100% downloadprogress pair just to report install
+      // status even though nothing is transferred -- so gate all "downloading"
+      // chrome on availability rather than on the events themselves.
+      const needsDownload = availability !== "available";
+      setStatus(needsDownload ? "downloading model" : "loading model", "busy");
+      if (needsDownload) {
+        progressWrap.hidden = false;
+        progressLabel.textContent = "Starting the one-time ~4 GB model download...";
+      }
+
+      // create() can hang indefinitely with no event and no error if the
+      // ~4GB model download never starts (offline, or Chrome deferring it
+      // because the device is on battery power). Without this watchdog the
+      // UI sits on "downloading" forever with no feedback.
+      const STALL_TIMEOUT_MS = 30000;
+      const controller = new AbortController();
+      let lastProgressAt = Date.now();
+      const watchdog = needsDownload && setInterval(() => {
+        const stalledForMs = Date.now() - lastProgressAt;
+        if (stalledForMs > STALL_TIMEOUT_MS) {
+          controller.abort();
+        } else if (stalledForMs > 8000) {
+          progressLabel.textContent =
+            `Still waiting (${Math.round(stalledForMs / 1000)}s, no progress)... ` +
+            "this stalls if you're offline, or if Chrome is deferring the download " +
+            "because the device is on battery power.";
+        }
+      }, 1000);
+
+      try {
+        session = await LanguageModel.create({
+          signal: controller.signal,
+          monitor(m) {
+            m.addEventListener("downloadprogress", (e) => {
+              if (!needsDownload) return;
+              lastProgressAt = Date.now();
+              const pct = Math.round(e.loaded * 100);
+              progressFill.style.width = pct + "%";
+              progressLabel.textContent = `Downloading model: ${pct}% (one time only)`;
+            });
+          },
+        });
+        progressWrap.hidden = true;
+        setStatus("ready", "ready");
+        for (const btn of messagesEl.querySelectorAll("#suggestions button")) btn.disabled = false;
+        updateUsage();
+        inputEl.focus();
+      } catch (err) {
+        setStatus("error", "error");
+        progressWrap.hidden = true;
+        if (err.name === "AbortError") {
+          addNote(
+            "Model download stalled for 30s with no progress. This usually means you're " +
+            "offline, or the device is on battery power and Chrome is deferring the ~4GB " +
+            "download until it's plugged in. Fix that, then click \"New chat\" to retry.",
+            true
+          );
+        } else {
+          addNote("Could not start a session: " + err.message, true);
+        }
+      } finally {
+        clearInterval(watchdog);
       }
     } finally {
-      clearInterval(watchdog);
       initializing = false;
+      updateControls();
     }
   }
 
-  async function send() {
-    const text = inputEl.value.trim();
-    if (!text || !session) return;
+  async function send(text) {
+    text = (text ?? inputEl.value).trim();
+    if (!text || !session || generating) return;
 
     addBubble("user", text);
     inputEl.value = "";
     inputEl.style.height = "auto";
-    sendBtn.disabled = true;
-    inputEl.disabled = true;
-    setStatus("thinking...", "busy");
+    generating = new AbortController();
+    updateControls();
+    setStatus("thinking", "busy");
 
     const assistantBubble = addBubble("assistant", "");
+    assistantBubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
     let raw = "";
     try {
-      const stream = session.promptStreaming(text);
+      const stream = session.promptStreaming(text, { signal: generating.signal });
       for await (const chunk of stream) {
+        const stick = nearBottom();
         raw += chunk;
         assistantBubble.innerHTML = renderMarkdown(raw);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        if (stick) scrollToBottom(true);
       }
     } catch (err) {
-      assistantBubble.classList.add("error");
-      assistantBubble.textContent = "Error: " + err.message;
+      if (err.name === "AbortError") {
+        assistantBubble.innerHTML = renderMarkdown(raw);
+        assistantBubble.insertAdjacentHTML("beforeend", '<div class="stopped">Stopped</div>');
+      } else {
+        assistantBubble.className = "bubble error";
+        assistantBubble.textContent =
+          err.name === "QuotaExceededError"
+            ? "This conversation is too long for the model's context window. Click \"New chat\" to start over."
+            : "Error: " + err.message;
+      }
     } finally {
+      generating = null;
       setStatus("ready", "ready");
-      sendBtn.disabled = false;
-      inputEl.disabled = false;
+      updateUsage();
+      updateControls();
       inputEl.focus();
     }
   }
 
-  sendBtn.addEventListener("click", send);
+  sendBtn.addEventListener("click", () => (generating ? generating.abort() : send()));
   inputEl.addEventListener("keydown", (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
       e.preventDefault();
       send();
+    } else if (e.key === "Escape" && generating) {
+      generating.abort();
     }
   });
   inputEl.addEventListener("input", () => {
     inputEl.style.height = "auto";
-    inputEl.style.height = Math.min(inputEl.scrollHeight, 160) + "px";
+    inputEl.style.height = Math.min(inputEl.scrollHeight, 200) + "px";
+    updateControls();
   });
 
-  let initializing = false;
   clearBtn.addEventListener("click", () => {
     if (initializing) return;
+    generating?.abort();
     if (session) { session.destroy(); session = null; }
-    messagesEl.innerHTML = "";
-    inputEl.disabled = true;
-    sendBtn.disabled = true;
+    usageEl.textContent = "";
     initSession();
   });
 

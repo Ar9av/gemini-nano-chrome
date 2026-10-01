@@ -9,6 +9,7 @@ const progressLabel = document.getElementById("progressLabel");
 
 let session = null;
 let starting = false;
+let generating = null; // AbortController while a reply streams
 
 function setStatus(text, kind) {
   statusEl.textContent = text;
@@ -20,26 +21,39 @@ function escapeHtml(str) {
 }
 
 function renderInline(text) {
-  text = text.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
-  text = text.replace(/(^|[^*])\*(?!\*)(.+?)\*(?!\*)/g, "$1<em>$2</em>");
-  text = text.replace(/`(.+?)`/g, "<code>$1</code>");
-  return text;
+  // Split out `code` spans first so their contents aren't formatted.
+  return text
+    .split(/(`[^`\n]+`)/)
+    .map((part, i) =>
+      i % 2
+        ? "<code>" + part.slice(1, -1) + "</code>"
+        : part
+            .replace(/\*\*(?!\s)(.+?)\*\*/g, "<strong>$1</strong>")
+            .replace(/(^|[\s(])\*(?![\s*])([^*]+?)\*(?=[\s.,;:!?)]|$)/g, "$1<em>$2</em>")
+    )
+    .join("");
 }
 
+// Gemini Nano replies in Markdown (headings, bold, lists, paragraphs). This
+// renders just enough of it, line by line, so raw "**" / "*" / "##" never
+// show up in the chat. Nested lists are flattened.
 function renderMarkdown(raw) {
-  const blocks = escapeHtml(raw).split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
-  return blocks
-    .map((block) => {
-      const lines = block.split("\n").filter((l) => l.trim().length);
-      if (lines.length && lines.every((l) => /^[*-]\s+/.test(l.trim()))) {
-        const items = lines
-          .map((l) => "<li>" + renderInline(l.trim().replace(/^[*-]\s+/, "")) + "</li>")
-          .join("");
-        return "<ul>" + items + "</ul>";
-      }
-      return "<p>" + renderInline(block).replace(/\n/g, "<br>") + "</p>";
-    })
-    .join("");
+  let html = "";
+  let open = null; // "p" | "ul" | "ol"
+  const close = () => { if (open) html += `</${open}>`; open = null; };
+  const ensure = (tag, attrs = "") => { if (open !== tag) { close(); html += `<${tag}${attrs}>`; open = tag; } };
+  for (const line of escapeHtml(raw).split("\n")) {
+    const t = line.trim();
+    let m;
+    if (!t) close();
+    else if ((m = t.match(/^#{1,6}\s+(.*)/))) { close(); html += `<p><strong>${renderInline(m[1])}</strong></p>`; }
+    else if ((m = t.match(/^[*-]\s+(.*)/))) { ensure("ul"); html += `<li>${renderInline(m[1])}</li>`; }
+    else if ((m = t.match(/^(\d+)[.)]\s+(.*)/))) { ensure("ol", ` start="${m[1]}"`); html += `<li>${renderInline(m[2])}</li>`; }
+    else if (open === "p") html += "<br>" + renderInline(t);
+    else { close(); html += "<p>" + renderInline(t); open = "p"; }
+  }
+  close();
+  return html;
 }
 
 function addBubble(role, text) {
@@ -131,18 +145,31 @@ async function send() {
   }
 
   const assistantBubble = addBubble("assistant", "");
+  assistantBubble.innerHTML = '<div class="typing"><span></span><span></span><span></span></div>';
+  generating = new AbortController();
+  sendBtn.textContent = "Stop";
+  sendBtn.classList.add("stop");
+  sendBtn.disabled = false;
   let raw = "";
   try {
-    const stream = session.promptStreaming(text);
+    const stream = session.promptStreaming(text, { signal: generating.signal });
     for await (const chunk of stream) {
+      const stick = messagesEl.scrollHeight - messagesEl.scrollTop - messagesEl.clientHeight < 60;
       raw += chunk;
       assistantBubble.innerHTML = renderMarkdown(raw);
-      messagesEl.scrollTop = messagesEl.scrollHeight;
+      if (stick) messagesEl.scrollTop = messagesEl.scrollHeight;
     }
   } catch (err) {
-    assistantBubble.classList.add("error");
-    assistantBubble.textContent = "Error: " + err.message;
+    if (err.name === "AbortError") {
+      assistantBubble.innerHTML = renderMarkdown(raw) + '<div class="stopped">Stopped</div>';
+    } else {
+      assistantBubble.classList.add("error");
+      assistantBubble.textContent = "Error: " + err.message;
+    }
   } finally {
+    generating = null;
+    sendBtn.textContent = "Send";
+    sendBtn.classList.remove("stop");
     setStatus("ready", "ready");
     sendBtn.disabled = false;
     inputEl.disabled = false;
@@ -150,11 +177,13 @@ async function send() {
   }
 }
 
-sendBtn.addEventListener("click", send);
+sendBtn.addEventListener("click", () => (generating ? generating.abort() : send()));
 inputEl.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
     send();
+  } else if (e.key === "Escape" && generating) {
+    generating.abort();
   }
 });
 inputEl.addEventListener("input", () => {
@@ -164,6 +193,7 @@ inputEl.addEventListener("input", () => {
 
 clearBtn.addEventListener("click", () => {
   if (starting) return;
+  generating?.abort();
   if (session) { session.destroy(); session = null; }
   messagesEl.innerHTML = "";
   checkAvailability();

@@ -15,6 +15,19 @@
     --assistant-bubble: #1d1f26;
     --danger: #ff6b6b;
   }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #fafafa;
+      --panel: #ffffff;
+      --border: #e2e3e8;
+      --text: #1b1c20;
+      --muted: #6b6e78;
+      --accent: #4c6ef5;
+      --user-bubble: #e6ebff;
+      --assistant-bubble: #f1f2f5;
+      --danger: #d64545;
+    }
+  }
   * { box-sizing: border-box; }
   html, body {
     margin: 0;
@@ -84,7 +97,7 @@
   .bubble.assistant ul { margin: 0 0 8px; padding-left: 18px; }
   .bubble.assistant ul:last-child { margin-bottom: 0; }
   .bubble.assistant code {
-    background: #0e0f12;
+    background: var(--bg);
     border: 1px solid var(--border);
     border-radius: 4px;
     padding: 1px 4px;
@@ -143,7 +156,17 @@
     font-weight: 600;
     cursor: pointer;
   }
-  #sendBtn:disabled { background: #3a3d46; cursor: not-allowed; }
+  #sendBtn:disabled { opacity: 0.4; cursor: not-allowed; }
+  #sendBtn.stop { background: var(--text); color: var(--bg); }
+  .stopped { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .bubble.assistant ol { margin: 0 0 8px; padding-left: 20px; }
+  .bubble.assistant ol + ul { margin-top: -4px; padding-left: 36px; }
+  .typing { display: inline-flex; gap: 4px; padding: 4px 0; }
+  .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: pulse 1.2s ease-in-out infinite; }
+  .typing span:nth-child(2) { animation-delay: 0.15s; }
+  .typing span:nth-child(3) { animation-delay: 0.3s; }
+  @keyframes pulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { .typing span { animation: none; } }
 </style>
 </head>
 <body>

@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="docs/chrome.svg" width="48" alt="Chrome" />&nbsp;&nbsp;&nbsp;<img src="docs/gemini.svg" width="48" alt="Gemini" />
+</p>
+
 # Gemini Nano in Chrome
 
 Chrome ships a small local language model, Gemini Nano, built into the browser. It's exposed through a JavaScript API called the Prompt API (`LanguageModel`). No API key, no server, no external network calls once the model is downloaded. Everything runs on the user's machine.
@@ -12,6 +16,10 @@ cd gemini-nano-chrome
 npm start
 ```
 
+![Setup: clone, npm start, chat](docs/setup.gif)
+
+<sub>Higher quality: [docs/setup.mp4](docs/setup.mp4). Recorded with the model already cached; a first run spends a few minutes downloading it.</sub>
+
 One command: launches Chrome with the right flags set (no manual `chrome://flags` clicking), starts the OpenAI-compatible API server, serves the chat UI, and opens it in a new tab. First run downloads the ~4 GB model, so give it a few minutes; `npm start` again afterward reuses the same Chrome instance and is instant.
 
 ```
@@ -25,7 +33,7 @@ Everything below explains what that command is doing and how to use each piece d
 
 | | |
 |---|---|
-| Chrome | 138+ (Dev or Canary channel recommended; this repo was verified on 149) |
+| Chrome | 138+ (Dev or Canary channel recommended; this repo was verified on 149 and 154) |
 | OS | Windows 10/11, macOS 13+, Linux, or ChromeOS on a Chromebook Plus |
 | Storage | 22 GB free |
 | GPU | 4 GB+ VRAM, **or** |
@@ -37,6 +45,8 @@ Everything below explains what that command is doing and how to use each piece d
 1. Open `chrome://flags/#optimization-guide-on-device-model` and set it to **Enabled BypassPerfRequirement**
 2. Open `chrome://flags/#prompt-api-for-gemini-nano` and set it to **Enabled**
 3. Relaunch Chrome (the flags page has a button for this)
+
+On Chrome 154+, the first flag no longer exists and the second is called `chrome://flags/#prompt-api`. The Prompt API is on by default there, so you may not need either. `npm start` handles both versions.
 
 That's the whole setup. Everything else happens through JavaScript.
 
@@ -65,7 +75,7 @@ The first `create()` call starts the model download. `availability()` only repor
 cd web && python3 -m http.server 8123
 ```
 
-Open `http://localhost:8123` in Chrome (with the flags from above already enabled). It shows the model-download progress bar on first run, then a chat thread: type a message, get a streamed reply, "New chat" resets the session.
+Open `http://localhost:8123` in Chrome (with the flags from above already enabled). It shows a download progress bar on first run, then a chat with starter prompts. Replies stream in with Markdown rendering, Stop (or Esc) cancels a reply, a footer counter shows how much of the context window is used, and "New chat" resets the session. It follows your system light/dark setting.
 
 A plain `file://` open works in some Chrome versions too, but the Prompt API expects a secure context, so serving it over `http://localhost` is the reliable option.
 
@@ -277,4 +287,4 @@ Either way, treat the API as progressive enhancement: check `availability()` and
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+MIT, see [LICENSE](LICENSE). Chrome and Gemini icons from [theSVG](https://thesvg.org) (CC0).
